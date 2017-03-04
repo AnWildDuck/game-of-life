@@ -3,7 +3,7 @@ clock = time.Clock()
 
 info = {
     'window_size': (500, 300),
-    'grid_size': 50,
+    'grid_size': 100,
     'background': (50, 50, 50),
 
     'live_colour': (255, 255, 255),
@@ -57,6 +57,20 @@ def get_pos_on_game(info):
     return pos
 
 
+def show_messages(window, info, messages):
+
+    max_height = 30
+    margin = 10
+
+    f = font.SysFont(None, int(max_height))
+
+    for index in range(len(messages)):
+        surf = f.render(messages[index], 0, (255, 255, 255))
+
+        y = (margin + max_height) * index +  margin
+        window.blit(surf, (margin, y))
+
+
 def show_cells(window, grid, info):
 
     game_scale = info['game_size'] / info['grid_size']
@@ -66,54 +80,84 @@ def show_cells(window, grid, info):
         x, y = index_to_pos(info, value_index)
 
         value = grid[value_index]
-        if value: draw.rect(window, info['live_colour'], (x * game_scale, y * game_scale, int(game_scale + .5), int(game_scale + .5)))
+        if value: draw.rect(window, info['live_colour'], (x * game_scale, y * game_scale, int(game_scale), int(game_scale)))
 
 
 def update_cells(info, grid):
     copy = list(grid)
 
+    live_cells = []
     for index in range(len(grid)):
-        neighbours = 0
-        pos = index_to_pos(info, index)
+        if grid[index]: live_cells.append(index)
+
+    # Get all neighbours
+    neighbour_cells = []
+    for cell_index in live_cells:
+        pos = index_to_pos(info, cell_index)
 
         for x, y in [(0, 1), (1, 0), (0, -1), (-1, 0), (-1, 1), (1, 1), (1, -1), (-1, -1)]:
             new_pos = pos[0] + x, pos[1] + y
 
             # Is the new spot valid
             if new_pos[0] >= 0 and new_pos[1] >= 0 and new_pos[0] < info['grid_size'] and new_pos[1] < info['grid_size']:
-
                 new_index = pos_to_index(info, new_pos)
-                if copy[new_index]: neighbours += 1
 
-        # If live
-        if not grid[index]:
-            if neighbours == 3:
-                grid[index] = True
+                if not new_index in live_cells:
+                    neighbour_cells.append(new_index)
 
-        else:
-            if neighbours < 2: grid[index] = False
-            elif neighbours <= 3: pass
-            elif neighbours >= 4: grid[index] = False
 
-        # If dead
+    for cell_type in range(0, 2):
+        cells = [live_cells, neighbour_cells][cell_type]
+
+        for index in cells:
+            neighbours = 0
+            pos = index_to_pos(info, index)
+
+            for x, y in [(0, 1), (1, 0), (0, -1), (-1, 0), (-1, 1), (1, 1), (1, -1), (-1, -1)]:
+                new_pos = pos[0] + x, pos[1] + y
+
+                # Is the new spot valid
+                if new_pos[0] >= 0 and new_pos[1] >= 0 and new_pos[0] < info['grid_size'] and new_pos[1] < info['grid_size']:
+
+                    new_index = pos_to_index(info, new_pos)
+                    if copy[new_index]: neighbours += 1
+
+            print(neighbours, cell_type)
+
+            # If live
+            if cell_type == 1:
+                if neighbours == 3:
+                    grid[index] = True
+
+            else:
+                if neighbours < 2: grid[index] = False
+                elif neighbours <= 3: pass
+                elif neighbours >= 4: grid[index] = False
+
+            # If dead
 
     return grid
 
 
 def game(info):
+    import time
 
     # Add the game size (NOT window size) to info
     info['game_size'] = int(min(info['window_size']))
     grid = make_grid(info['grid_size'])
 
     global clock
+    init()
 
     # Set windows
     main_window = display.set_mode(info['window_size'], RESIZABLE)
     game_window = Surface((info['game_size'],) * 2)
 
     running = 0
-    time = 0
+    t = 0
+    last_time = time.time()
+
+    speed = 1
 
     while True:
 
@@ -137,6 +181,7 @@ def game(info):
 
                 if e.key == K_SPACE:
                     grid = update_cells(info, grid)
+                    last_time = time.time()
 
                 if e.key == K_c:
                     grid = make_grid(info['grid_size'])
@@ -146,21 +191,31 @@ def game(info):
         grid = change_cells(grid, info)
         show_cells(game_window, grid, info)
 
-        display.set_caption(str(time))
-
-        time_to_update = 0.1
+        display.set_caption(str(t))
+        dt = clock.tick() / 1000
 
         if running:
-            time += clock.tick() / 1000
-            if time > time_to_update:
+            t += dt * speed * 10
+            if t > 1:
                 grid = update_cells(info, grid)
-                time -= time_to_update
+                t -= 1
+                last_time = time.time()
 
-        clock.tick()
 
+        messages = ['Time since last: ' + str(round(time.time() - last_time, 5)),
+                    'Speed: ' + str(round(speed, 5)),
+                    'Running: ' + str(bool(running)),
+                    ]
+
+        k = key.get_pressed()
+        if k[K_UP]: speed += dt
+        if k[K_DOWN]: speed -= dt
+        speed = max(speed, 0)
 
         # Add the game window to the main and show
+        main_window.fill((10, 10, 10))
         main_window.blit(game_window, ((info['window_size'][0] - info['game_size']) / 2, (info['window_size'][1] - info['game_size']) / 2))
+        # show_messages(main_window, info, messages)
         display.update()
 
 
