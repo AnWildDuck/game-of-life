@@ -122,8 +122,6 @@ def update_cells(info, grid):
                     new_index = pos_to_index(info, new_pos)
                     if copy[new_index]: neighbours += 1
 
-            print(neighbours, cell_type)
-
             # If live
             if cell_type == 1:
                 if neighbours == 3:
